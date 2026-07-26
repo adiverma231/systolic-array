@@ -1,2 +1,5 @@
 # Sensitive
 project_B_plan.md
+
+# Local HDL simulation products
+tb/sim_build/
