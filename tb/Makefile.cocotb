@@ -1,0 +1,30 @@
+# Cocotb entry point for the Stage 1 tile-level accelerator test.
+# Usage: make -f Makefile.cocotb SIM=icarus N=4 K=4
+
+SIM ?= icarus
+TOPLEVEL_LANG ?= verilog
+TOPLEVEL ?= top
+MODULE ?= test_array
+N ?= 4
+K ?= $(N)
+SIM_BUILD ?= sim_build_cocotb_$(SIM)_n$(N)_k$(K)
+
+THIS_DIR := $(dir $(abspath $(lastword $(MAKEFILE_LIST))))
+
+VERILOG_SOURCES := $(THIS_DIR)/../rtl/pe_os.sv \
+                   $(THIS_DIR)/../rtl/skew_feeder.sv \
+                   $(THIS_DIR)/../rtl/systolic_array.sv \
+                   $(THIS_DIR)/../rtl/input_buffer.sv \
+                   $(THIS_DIR)/../rtl/output_buffer.sv \
+                   $(THIS_DIR)/../rtl/control_fsm.sv \
+                   $(THIS_DIR)/../rtl/top.sv
+
+ifeq ($(SIM),icarus)
+COMPILE_ARGS += -g2012 -Ptop.N=$(N) -Ptop.K=$(K)
+else ifeq ($(SIM),verilator)
+COMPILE_ARGS += -GN=$(N) -GK=$(K)
+endif
+export N K
+export PYTHONPATH := $(THIS_DIR):$(PYTHONPATH)
+
+include $(shell cocotb-config --makefiles)/Makefile.sim
