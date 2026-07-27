@@ -3,3 +3,8 @@ project_B_plan.md
 
 # Local HDL simulation products
 tb/sim_build/
+tb/sim_build_array_*/
+tb/sim_build_top_*/
+tb/sim_build_cocotb_*/
+tb/__pycache__/
+tb/results.xml
