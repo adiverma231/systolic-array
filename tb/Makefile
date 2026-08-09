@@ -15,10 +15,25 @@ N ?= 4
 K ?= $(N)
 ARRAY_BUILD_DIR ?= sim_build_array_n$(N)_k$(K)
 
-TILE_RTL ?= ../rtl/pe_os.sv ../rtl/skew_feeder.sv ../rtl/systolic_array.sv ../rtl/input_buffer.sv ../rtl/output_buffer.sv ../rtl/control_fsm.sv ../rtl/top.sv
+TILE_RTL ?= ../rtl/pe_os.sv ../rtl/skew_feeder.sv ../rtl/systolic_array.sv ../rtl/input_buffer.sv ../rtl/output_buffer.sv ../rtl/control_fsm.sv ../rtl/pe_ws.sv ../rtl/ws_skew_feeder.sv ../rtl/systolic_array_ws.sv ../rtl/output_buffer_ws.sv ../rtl/control_fsm_ws.sv ../rtl/top.sv
 TILE_TB ?= tb_top.sv
 TILE_TEST_TOP ?= tb_top
 TILE_BUILD_DIR ?= sim_build_top_n$(N)_k$(K)
+
+WS_TILE_RTL ?= $(TILE_RTL)
+WS_TILE_TB ?= tb_top.sv tb_top_ws.sv
+WS_TILE_TEST_TOP ?= tb_top_ws
+WS_TILE_BUILD_DIR ?= sim_build_top_ws_n$(N)_k$(K)
+
+WS_PE_RTL ?= ../rtl/pe_ws.sv
+WS_PE_TB ?= tb_pe_ws.sv
+WS_PE_TOP ?= tb_pe_ws
+WS_PE_BUILD_DIR ?= sim_build_pe_ws
+
+WS_ARRAY_RTL ?= ../rtl/pe_ws.sv ../rtl/ws_skew_feeder.sv ../rtl/systolic_array_ws.sv ../rtl/output_buffer_ws.sv
+WS_ARRAY_TB ?= tb_systolic_array_ws.sv
+WS_ARRAY_TOP ?= tb_systolic_array_ws
+WS_ARRAY_BUILD_DIR ?= sim_build_array_ws_n$(N)
 
 IVERILOG := $(shell command -v iverilog 2>/dev/null)
 VVP := $(shell command -v vvp 2>/dev/null)
@@ -43,8 +58,12 @@ endif
 .PHONY: run compile clean help
 
 help:
-	@echo "Usage: make run [SIM=iverilog|verilator] [RTL=../rtl/pe_os.sv]"
-	@echo "The testbench assumes the Stage 0 pe_os interface documented in README.md."
+	@echo "PE:        make run SIM=iverilog"
+	@echo "OS array:  make array-regression SIM=iverilog"
+	@echo "OS top:    make top-regression SIM=iverilog"
+	@echo "WS direct: make ws-regression SIM=iverilog"
+	@echo "WS top:    make top-ws-regression SIM=iverilog"
+	@echo "Use SIM=verilator and an explicit N/K with any *-run target as needed."
 
 ifeq ($(SIM),iverilog)
 run: compile
@@ -70,7 +89,7 @@ endif
 clean:
 	@rm -rf $(BUILD_DIR)
 
-.PHONY: array-run array-regression array-clean top-run top-regression top-clean
+.PHONY: array-run array-regression array-clean top-run top-regression top-clean top-ws-run top-ws-regression top-ws-clean ws-pe-run ws-pe-clean ws-array-run ws-array-regression ws-array-clean ws-regression
 
 ifeq ($(SIM),iverilog)
 array-run:
@@ -90,7 +109,7 @@ array-run:
 endif
 
 array-regression:
-	@for size in 2 4 8; do $(MAKE) --no-print-directory array-run SIM=$(SIM) N=$$size K=$$size; done
+	@set -e; for size in 2 4 8; do $(MAKE) --no-print-directory array-run SIM=$(SIM) N=$$size K=$$size; done
 
 array-clean:
 	@rm -rf $(ARRAY_BUILD_DIR)
@@ -113,7 +132,69 @@ top-run:
 endif
 
 top-regression:
-	@for size in 2 4 8; do $(MAKE) --no-print-directory top-run SIM=$(SIM) N=$$size K=$$size; done
+	@set -e; for size in 1 2 4 8; do $(MAKE) --no-print-directory top-run SIM=$(SIM) N=$$size K=$$size; done
 
 top-clean:
 	@rm -rf $(TILE_BUILD_DIR)
+
+ifeq ($(SIM),iverilog)
+top-ws-run:
+	@for tb in $(WS_TILE_TB); do if [ ! -f "$$tb" ]; then echo "ERROR: WS tile-level testbench not found: $$tb" >&2; exit 2; fi; done
+	@mkdir -p $(WS_TILE_BUILD_DIR)
+	@iverilog -g2012 -Wall -s $(WS_TILE_TEST_TOP) -P$(WS_TILE_TEST_TOP).N=$(N) -P$(WS_TILE_TEST_TOP).K=$(K) -o $(WS_TILE_BUILD_DIR)/$(WS_TILE_TEST_TOP).vvp $(WS_TILE_RTL) $(WS_TILE_TB)
+	@vvp $(WS_TILE_BUILD_DIR)/$(WS_TILE_TEST_TOP).vvp
+else ifeq ($(SIM),verilator)
+top-ws-run:
+	@for tb in $(WS_TILE_TB); do if [ ! -f "$$tb" ]; then echo "ERROR: WS tile-level testbench not found: $$tb" >&2; exit 2; fi; done
+	@verilator --binary --timing -Wall --top-module $(WS_TILE_TEST_TOP) -GN=$(N) -GK=$(K) --Mdir $(WS_TILE_BUILD_DIR) $(WS_TILE_RTL) $(WS_TILE_TB)
+	@$(WS_TILE_BUILD_DIR)/V$(WS_TILE_TEST_TOP)
+else
+top-ws-run:
+	@echo "ERROR: no supported open-source SystemVerilog simulator found. Install Icarus Verilog (iverilog + vvp) or Verilator, then rerun make top-ws-run." >&2
+	@exit 2
+endif
+
+top-ws-regression:
+	@set -e; for size in 1 2 4 8; do $(MAKE) --no-print-directory top-ws-run SIM=$(SIM) N=$$size K=$$size; done
+
+top-ws-clean:
+	@rm -rf $(WS_TILE_BUILD_DIR)
+
+ifeq ($(SIM),iverilog)
+ws-pe-run:
+	@if [ ! -f "$(WS_PE_TB)" ]; then echo "ERROR: WS PE testbench not found: $(WS_PE_TB)" >&2; exit 2; fi
+	@mkdir -p $(WS_PE_BUILD_DIR)
+	@iverilog -g2012 -Wall -s $(WS_PE_TOP) -o $(WS_PE_BUILD_DIR)/$(WS_PE_TOP).vvp $(WS_PE_RTL) $(WS_PE_TB)
+	@vvp $(WS_PE_BUILD_DIR)/$(WS_PE_TOP).vvp
+
+ws-array-run:
+	@if [ ! -f "$(WS_ARRAY_TB)" ]; then echo "ERROR: WS array testbench not found: $(WS_ARRAY_TB)" >&2; exit 2; fi
+	@mkdir -p $(WS_ARRAY_BUILD_DIR)
+	@iverilog -g2012 -Wall -s $(WS_ARRAY_TOP) -P$(WS_ARRAY_TOP).N=$(N) -o $(WS_ARRAY_BUILD_DIR)/$(WS_ARRAY_TOP).vvp $(WS_ARRAY_RTL) $(WS_ARRAY_TB)
+	@vvp $(WS_ARRAY_BUILD_DIR)/$(WS_ARRAY_TOP).vvp
+else ifeq ($(SIM),verilator)
+ws-pe-run:
+	@if [ ! -f "$(WS_PE_TB)" ]; then echo "ERROR: WS PE testbench not found: $(WS_PE_TB)" >&2; exit 2; fi
+	@verilator --binary --timing -Wall --top-module $(WS_PE_TOP) --Mdir $(WS_PE_BUILD_DIR) $(WS_PE_RTL) $(WS_PE_TB)
+	@$(WS_PE_BUILD_DIR)/V$(WS_PE_TOP)
+
+ws-array-run:
+	@if [ ! -f "$(WS_ARRAY_TB)" ]; then echo "ERROR: WS array testbench not found: $(WS_ARRAY_TB)" >&2; exit 2; fi
+	@verilator --binary --timing -Wall --top-module $(WS_ARRAY_TOP) -GN=$(N) --Mdir $(WS_ARRAY_BUILD_DIR) $(WS_ARRAY_RTL) $(WS_ARRAY_TB)
+	@$(WS_ARRAY_BUILD_DIR)/V$(WS_ARRAY_TOP)
+else
+ws-pe-run ws-array-run:
+	@echo "ERROR: no supported open-source SystemVerilog simulator found. Install Icarus Verilog (iverilog + vvp) or Verilator, then rerun the requested WS target." >&2
+	@exit 2
+endif
+
+ws-array-regression:
+	@set -e; for size in 2 4 8; do $(MAKE) --no-print-directory ws-array-run SIM=$(SIM) N=$$size; done
+
+ws-regression: ws-pe-run ws-array-regression
+
+ws-pe-clean:
+	@rm -rf $(WS_PE_BUILD_DIR)
+
+ws-array-clean:
+	@rm -rf $(WS_ARRAY_BUILD_DIR)

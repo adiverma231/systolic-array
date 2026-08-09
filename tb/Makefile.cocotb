@@ -1,4 +1,4 @@
-# Cocotb entry point for the Stage 1 tile-level accelerator test.
+# Cocotb entry point for the default OS tile-level accelerator test.
 # Usage: make -f Makefile.cocotb SIM=icarus N=4 K=4
 
 SIM ?= icarus
@@ -17,6 +17,11 @@ VERILOG_SOURCES := $(THIS_DIR)/../rtl/pe_os.sv \
                    $(THIS_DIR)/../rtl/input_buffer.sv \
                    $(THIS_DIR)/../rtl/output_buffer.sv \
                    $(THIS_DIR)/../rtl/control_fsm.sv \
+                   $(THIS_DIR)/../rtl/pe_ws.sv \
+                   $(THIS_DIR)/../rtl/ws_skew_feeder.sv \
+                   $(THIS_DIR)/../rtl/systolic_array_ws.sv \
+                   $(THIS_DIR)/../rtl/output_buffer_ws.sv \
+                   $(THIS_DIR)/../rtl/control_fsm_ws.sv \
                    $(THIS_DIR)/../rtl/top.sv
 
 ifeq ($(SIM),icarus)
