@@ -6,5 +6,6 @@ tb/sim_build/
 tb/sim_build_array_*/
 tb/sim_build_top_*/
 tb/sim_build_cocotb_*/
+tb/sim_build_pe_ws/
 tb/__pycache__/
 tb/results.xml
