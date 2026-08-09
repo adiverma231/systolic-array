@@ -11,6 +11,7 @@ module tb_top #(
     parameter int K            = N,
     parameter int DATA_WIDTH   = 8,
     parameter int ACC_WIDTH    = 32,
+    parameter     DATAFLOW     = "OS",
     parameter int RANDOM_TILES = 3
 );
 
@@ -51,7 +52,8 @@ module tb_top #(
         .N         (N),
         .K         (K),
         .DATA_WIDTH(DATA_WIDTH),
-        .ACC_WIDTH (ACC_WIDTH)
+        .ACC_WIDTH (ACC_WIDTH),
+        .DATAFLOW (DATAFLOW)
     ) dut (
         .clk        (clk),
         .rst        (rst),
