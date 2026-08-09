@@ -26,9 +26,18 @@ module input_buffer #(
     input  logic signed [DATA_WIDTH-1:0]          load_b_data,
 
     input  logic [((K > 1) ? $clog2(K) : 1)-1:0] slice_index,
-    output logic signed [DATA_WIDTH-1:0]          a_slice [0:N-1],
-    output logic signed [DATA_WIDTH-1:0]          b_slice [0:N-1]
+    input  logic [((N > 1) ? $clog2(N) : 1)-1:0] a_row_index,
+    output logic signed [DATA_WIDTH-1:0]          a_slice [0:((N > 1) ? N : 2)-1],
+    output logic signed [DATA_WIDTH-1:0]          b_slice [0:((N > 1) ? N : 2)-1],
+    output logic signed [DATA_WIDTH-1:0]          a_row_slice [0:((K > 1) ? K : 2)-1],
+    output logic signed [DATA_WIDTH-1:0]          b_weights [0:((K > 1) ? K : 2)-1][0:((N > 1) ? N : 2)-1]
 );
+
+    // Icarus Verilog does not accept a one-element unpacked array at every
+    // module boundary.  Keep public tile semantics at N/K entries, while
+    // exposing a harmless spare lane for the singleton configuration.
+    localparam int N_LANES = (N > 1) ? N : 2;
+    localparam int K_LANES = (K > 1) ? K : 2;
 
     logic signed [DATA_WIDTH-1:0] a_tile [0:N-1][0:K-1];
     logic signed [DATA_WIDTH-1:0] b_tile [0:K-1][0:N-1];
@@ -56,12 +65,35 @@ module input_buffer #(
         end
     end
 
-    // Combinational reads let the controller select each reduction slice
-    // before its source clock edge without adding a buffer-read bubble.
+    // Combinational reads let either dataflow select its source values before
+    // a source clock edge without adding a buffer-read bubble. OS consumes an
+    // A column plus B row; WS consumes an A row and the full stationary B
+    // tile during its preload phase.
     always_comb begin
+        for (int row = 0; row < N_LANES; row++) begin
+            a_slice[row] = '0;
+            b_slice[row] = '0;
+        end
+        for (int col = 0; col < K_LANES; col++) begin
+            a_row_slice[col] = '0;
+            for (int row = 0; row < N_LANES; row++) begin
+                b_weights[col][row] = '0;
+            end
+        end
+
         for (int row = 0; row < N; row++) begin
             a_slice[row] = a_tile[row][slice_index];
             b_slice[row] = b_tile[slice_index][row];
+        end
+
+        for (int col = 0; col < K; col++) begin
+            a_row_slice[col] = a_tile[a_row_index][col];
+        end
+
+        for (int k = 0; k < K; k++) begin
+            for (int col = 0; col < N; col++) begin
+                b_weights[k][col] = b_tile[k][col];
+            end
         end
     end
 
