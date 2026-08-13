@@ -1,5 +1,6 @@
-# Cocotb entry point for the default OS tile-level accelerator test.
-# Usage: make -f Makefile.cocotb SIM=icarus N=4 K=4
+# Cocotb entry point for the default OS tile-level and inference tests.
+# Usage: make -f Makefile.cocotb SIM=icarus MODULE=test_array N=4 K=4
+#        make -f Makefile.cocotb SIM=icarus MODULE=test_inference N=4 K=4
 
 SIM ?= icarus
 TOPLEVEL_LANG ?= verilog
