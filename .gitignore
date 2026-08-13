@@ -9,3 +9,6 @@ tb/sim_build_cocotb_*/
 tb/sim_build_pe_ws/
 tb/__pycache__/
 tb/results.xml
+flow/__pycache__/
+flow/runs/
+runs/
